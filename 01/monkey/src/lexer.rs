@@ -27,7 +27,13 @@ impl<'a> Lexer<'a> {
             None => Token::Eof,
             Some('=') => {
                 self.read_char();
-                Token::Assign
+                match self.ch {
+                    Some('=') => {
+                        self.read_char();
+                        Token::Equal
+                    }
+                    _ => Token::Assign,
+                }
             }
             Some(';') => {
                 self.read_char();
@@ -48,6 +54,36 @@ impl<'a> Lexer<'a> {
             Some('+') => {
                 self.read_char();
                 Token::Plus
+            }
+            Some('-') => {
+                self.read_char();
+                Token::Minus
+            }
+            Some('!') => {
+                self.read_char();
+                match self.ch {
+                    Some('=') => {
+                        self.read_char();
+                        Token::NotEqual
+                    }
+                    _ => Token::Bang,
+                }
+            }
+            Some('/') => {
+                self.read_char();
+                Token::Slash
+            }
+            Some('*') => {
+                self.read_char();
+                Token::Asterisk
+            }
+            Some('<') => {
+                self.read_char();
+                Token::Lt
+            }
+            Some('>') => {
+                self.read_char();
+                Token::Gt
             }
             Some('{') => {
                 self.read_char();
@@ -117,6 +153,11 @@ fn lookup_ident(ident: String) -> Token {
     match ident.as_ref() {
         "let" => Token::Let,
         "fn" => Token::Function,
+        "true" => Token::True,
+        "false" => Token::False,
+        "return" => Token::Return,
+        "if" => Token::If,
+        "else" => Token::Else,
         _ => Token::Ident(ident),
     }
 }
@@ -195,6 +236,76 @@ let result = add(five, ten);
             Token::Comma,
             Token::Ident("ten".to_string()),
             Token::RightParen,
+            Token::Semicolon,
+            Token::Eof,
+        ];
+
+        let mut l = Lexer::new(input);
+
+        let mut actual = Vec::new();
+        loop {
+            let t = l.next_token();
+            let end = t == Token::Illegal || t == Token::Eof;
+            actual.push(t);
+            if end {
+                break;
+            }
+        }
+        assert_eq!(tests, actual);
+    }
+
+    #[test]
+    fn test_next_token3() {
+        let input = r"
+        !-/*5;
+        5 < 10 > 5;
+        if (5 < 10) {
+            return true;
+        } else {
+            return false;
+        }
+
+        10 == 10;
+        10 != 9;
+        ";
+
+        let tests = vec![
+            Token::Bang,
+            Token::Minus,
+            Token::Slash,
+            Token::Asterisk,
+            Token::Int("5".to_string()),
+            Token::Semicolon,
+            Token::Int("5".to_string()),
+            Token::Lt,
+            Token::Int("10".to_string()),
+            Token::Gt,
+            Token::Int("5".to_string()),
+            Token::Semicolon,
+            Token::If,
+            Token::LeftParen,
+            Token::Int("5".to_string()),
+            Token::Lt,
+            Token::Int("10".to_string()),
+            Token::RightParen,
+            Token::LeftBrace,
+            Token::Return,
+            Token::True,
+            Token::Semicolon,
+            Token::RightBrace,
+            Token::Else,
+            Token::LeftBrace,
+            Token::Return,
+            Token::False,
+            Token::Semicolon,
+            Token::RightBrace,
+            Token::Int("10".to_string()),
+            Token::Equal,
+            Token::Int("10".to_string()),
+            Token::Semicolon,
+            Token::Int("10".to_string()),
+            Token::NotEqual,
+            Token::Int("9".to_string()),
             Token::Semicolon,
             Token::Eof,
         ];
