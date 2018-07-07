@@ -1,4 +1,3 @@
-use std::iter::Peekable;
 use std::str::Chars;
 use token::Token;
 
@@ -101,7 +100,10 @@ impl<'a> Lexer<'a> {
                 let number = self.read_number();
                 Token::Int(number)
             }
-            Some(_) => Token::Illegal,
+            Some(_) => {
+                self.read_char();
+                Token::Illegal
+            }
         };
         tok
     }
