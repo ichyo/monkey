@@ -2,8 +2,8 @@
 pub enum Token {
     Illegal,
     Eof,
-    Ident,
-    Int,
+    Ident(String),
+    Int(String),
     Assign,
     Plus,
     Comma,
