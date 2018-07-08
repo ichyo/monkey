@@ -4,6 +4,7 @@ use token::Token;
 pub struct Lexer<'a> {
     input: Chars<'a>,
     ch: Option<char>,
+    eof: bool,
 }
 
 impl<'a> Lexer<'a> {
@@ -11,6 +12,7 @@ impl<'a> Lexer<'a> {
         let mut l = Lexer {
             input: input.chars(),
             ch: None,
+            eof: false,
         };
         l.read_char();
         l
@@ -20,7 +22,10 @@ impl<'a> Lexer<'a> {
         self.ch = self.input.next()
     }
 
-    pub fn next_token(&mut self) -> Token {
+    pub fn next_token(&mut self) -> Option<Token> {
+        if self.eof {
+            return None;
+        }
         self.skip_whitespace();
         let tok = match self.ch {
             None => Token::Eof,
@@ -105,7 +110,10 @@ impl<'a> Lexer<'a> {
                 Token::Illegal
             }
         };
-        tok
+        if tok == Token::Eof {
+            self.eof = true;
+        }
+        Some(tok)
     }
 
     fn read_identifier(&mut self) -> String {
@@ -139,6 +147,14 @@ impl<'a> Lexer<'a> {
             }
             self.read_char();
         }
+    }
+}
+
+impl<'a> Iterator for Lexer<'a> {
+    type Item = Token;
+
+    fn next(&mut self) -> Option<Token> {
+        self.next_token()
     }
 }
 
@@ -185,10 +201,9 @@ mod tests {
         ];
 
         let mut l = Lexer::new(input);
+        let actual: Vec<_> = l.collect();
 
-        for t in tests {
-            assert_eq!(t, l.next_token());
-        }
+        assert_eq!(tests, actual);
     }
 
     #[test]
@@ -243,16 +258,7 @@ let result = add(five, ten);
         ];
 
         let mut l = Lexer::new(input);
-
-        let mut actual = Vec::new();
-        loop {
-            let t = l.next_token();
-            let end = t == Token::Illegal || t == Token::Eof;
-            actual.push(t);
-            if end {
-                break;
-            }
-        }
+        let mut actual: Vec<_> = l.collect();
         assert_eq!(tests, actual);
     }
 
@@ -313,16 +319,7 @@ let result = add(five, ten);
         ];
 
         let mut l = Lexer::new(input);
-
-        let mut actual = Vec::new();
-        loop {
-            let t = l.next_token();
-            let end = t == Token::Illegal || t == Token::Eof;
-            actual.push(t);
-            if end {
-                break;
-            }
-        }
+        let mut actual: Vec<_> = l.collect();
         assert_eq!(tests, actual);
     }
 }

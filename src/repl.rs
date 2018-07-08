@@ -13,12 +13,8 @@ pub fn start<R: Read, W: Write>(input: R, mut output: W) {
         let mut line = String::new();
         reader.read_line(&mut line).unwrap();
         let mut l = Lexer::new(&line);
-        loop {
-            let tok = l.next_token();
+        for tok in l {
             writeln!(output, "{:?}", tok).unwrap();
-            if tok == Token::Eof {
-                break;
-            }
         }
     }
 }
