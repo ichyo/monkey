@@ -15,6 +15,17 @@ type Result<T> = result::Result<T, ParseError>;
 #[derive(Debug)]
 struct ParseError(String);
 
+#[derive(PartialEq, PartialOrd)]
+enum Precedence {
+    Lowest,
+    Equals,      // ==
+    LessGreater, // > or <
+    Sum,         // +
+    Product,     // *
+    Prefix,      // -X or !X
+    Call,        // myFunction(X)
+}
+
 impl From<String> for ParseError {
     fn from(w: String) -> ParseError {
         ParseError(w)
@@ -94,10 +105,33 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expression(&mut self) -> Result<Expression> {
-        // TODO: implement
-        self.bump();
+        self.parse_expression_impl(Precedence::Lowest)
+    }
+
+    fn parse_expression_impl(&mut self, precedence: Precedence) -> Result<Expression> {
+        self.prefix_parse()
+    }
+
+    fn prefix_parse(&mut self) -> Result<Expression> {
+        match self.token {
+            Some(Token::Ident(_)) => self.prefix_identifier(),
+            Some(Token::Int(_)) => self.prefix_integer(),
+            Some(t) => Err(format!("unknown token for prefix parse: {:?}", t).into()),
+            None => Err(format!("no token found for prefix parse").into()),
+        }
+    }
+
+    fn prefix_identifier(&mut self) -> Result<Expression> {
+        let ident = self.parse_identifier()?;
         Ok(Expression {
-            node: ExpressionKind::Identifier(Identifier { value: 0 }),
+            node: ExpressionKind::Identifier(ident),
+        })
+    }
+
+    fn prefix_integer(&mut self) -> Result<Expression> {
+        let integer = self.parse_integer()?;
+        Ok(Expression {
+            node: ExpressionKind::IntegerLiteral(integer),
         })
     }
 
@@ -122,7 +156,7 @@ impl<'a> Parser<'a> {
 
     fn parse_expression_statement(&mut self) -> Result<ExpressionStatement> {
         let expr = self.parse_expression()?;
-        self.expect(&Token::Semicolon)?;
+        self.eat(&Token::Semicolon);
         Ok(ExpressionStatement { expr })
     }
 
@@ -134,6 +168,17 @@ impl<'a> Parser<'a> {
             }
             Some(tok) => Err(format!("[ident] unexpected token: {:?}", tok).into()),
             None => Err(format!("[ident] no token found").into()),
+        }
+    }
+
+    fn parse_integer(&mut self) -> Result<IntegerLiteral> {
+        match self.token {
+            Some(Token::Int(value)) => {
+                self.bump();
+                Ok(IntegerLiteral { value })
+            }
+            Some(tok) => Err(format!("[integer] unexpected token: {:?}", tok).into()),
+            None => Err(format!("[integer] no token found").into()),
         }
     }
 }
@@ -196,6 +241,25 @@ mod tests {
 
         if let StatementKind::Expression(stmt) = &program.statements[0].node {
             if let ExpressionKind::Identifier(ident) = &stmt.expr.node {
+            } else {
+                panic!("not identifier");
+            }
+        } else {
+            panic!("not expression statement");
+        }
+    }
+
+    #[test]
+    fn test_integer_expression() {
+        let input = "300;";
+
+        let mut p = Parser::new(input);
+        let program = p.parse_program().unwrap();
+        assert_eq!(1, program.statements.len());
+
+        if let StatementKind::Expression(stmt) = &program.statements[0].node {
+            if let ExpressionKind::IntegerLiteral(integer) = &stmt.expr.node {
+                assert_eq!(300, integer.value);
             } else {
                 panic!("not identifier");
             }

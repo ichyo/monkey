@@ -101,7 +101,7 @@ impl Code for Expression {
     fn code(&self) -> String {
         match &self.node {
             ExpressionKind::Identifier(x) => x.code(),
-            ExpressionKind::Integer => unreachable!(),
+            ExpressionKind::IntegerLiteral(x) => x.code(),
         }
     }
 }
@@ -109,7 +109,18 @@ impl Code for Expression {
 #[derive(Debug)]
 pub enum ExpressionKind {
     Identifier(Identifier),
-    Integer,
+    IntegerLiteral(IntegerLiteral),
+}
+
+#[derive(Debug)]
+pub struct IntegerLiteral {
+    pub value: i64,
+}
+
+impl Code for IntegerLiteral {
+    fn code(&self) -> String {
+        format!("{}", self.value)
+    }
 }
 
 #[cfg(test)]
