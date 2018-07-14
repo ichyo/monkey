@@ -77,9 +77,13 @@ impl<'a> Parser<'a> {
         let node = match self.token {
             Some(Token::Let) => {
                 let s = self.parse_let_statement()?;
-                Ok(StatementKind::Let(Box::new(s)))
+                Ok(StatementKind::Let(s))
             }
-            Some(ref tok) => Err(format!("[stmt] unexpected token: {:?}", tok)),
+            Some(Token::Return) => {
+                let s = self.parse_return_statement()?;
+                Ok(StatementKind::Return(s))
+            }
+            Some(tok) => Err(format!("[stmt] unexpected token: {:?}", tok)),
             None => Err(format!("[stmt] no token found")),
         }?;
         Ok(Statement { node })
@@ -89,7 +93,7 @@ impl<'a> Parser<'a> {
         // TODO: implement
         self.bump();
         Ok(Expression {
-            node: ExpressionKind::Identifier(Box::new(Identifier { value: 0 })),
+            node: ExpressionKind::Identifier(Identifier { value: 0 }),
         })
     }
 
@@ -100,9 +104,16 @@ impl<'a> Parser<'a> {
         let expr = self.parse_expression()?;
         self.expect(&Token::Semicolon)?;
         Ok(LetStatement {
-            name: Box::new(ident),
-            value: Box::new(expr),
+            name: ident,
+            value: expr,
         })
+    }
+
+    fn parse_return_statement(&mut self) -> Result<ReturnStatement> {
+        self.expect(&Token::Return)?;
+        let expr = self.parse_expression()?;
+        self.expect(&Token::Semicolon)?;
+        Ok(ReturnStatement { value: expr })
     }
 
     fn parse_identifier(&mut self) -> Result<Identifier> {
@@ -142,6 +153,25 @@ mod tests {
                 assert_eq!(t, stmt.name.value);
             } else {
                 panic!("it's not identifer");
+            }
+        }
+    }
+
+    #[test]
+    fn test_return_statement() {
+        let input = r"
+        return 5;
+        return 10;
+        return 993322;
+        ";
+        let mut p = Parser::new(input);
+        let program = p.parse_program().unwrap();
+        assert_eq!(3, program.statements.len());
+
+        for stmt in program.statements.iter() {
+            if let StatementKind::Return(stmt) = &stmt.node {
+            } else {
+                panic!("it's not return");
             }
         }
     }
