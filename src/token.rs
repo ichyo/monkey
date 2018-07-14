@@ -1,10 +1,10 @@
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub enum Token {
     Illegal,
     Eof,
 
-    Ident(String),
-    Int(String),
+    Ident(u32),
+    Int(i64),
 
     Assign,
     Plus,
