@@ -101,6 +101,7 @@ impl Code for Expression {
     fn code(&self) -> String {
         match &self.node {
             ExpressionKind::Identifier(x) => x.code(),
+            ExpressionKind::Integer => unreachable!(),
         }
     }
 }
@@ -108,6 +109,7 @@ impl Code for Expression {
 #[derive(Debug)]
 pub enum ExpressionKind {
     Identifier(Identifier),
+    Integer,
 }
 
 #[cfg(test)]

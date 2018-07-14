@@ -1,5 +1,6 @@
 use ast::*;
 use lexer::Lexer;
+use std::collections::HashMap;
 use std::fmt;
 use std::result;
 use token::Token;
@@ -83,7 +84,10 @@ impl<'a> Parser<'a> {
                 let s = self.parse_return_statement()?;
                 Ok(StatementKind::Return(s))
             }
-            Some(tok) => Err(format!("[stmt] unexpected token: {:?}", tok)),
+            Some(tok) => {
+                let s = self.parse_expression_statement()?;
+                Ok(StatementKind::Expression(s))
+            }
             None => Err(format!("[stmt] no token found")),
         }?;
         Ok(Statement { node })
@@ -116,6 +120,12 @@ impl<'a> Parser<'a> {
         Ok(ReturnStatement { value: expr })
     }
 
+    fn parse_expression_statement(&mut self) -> Result<ExpressionStatement> {
+        let expr = self.parse_expression()?;
+        self.expect(&Token::Semicolon)?;
+        Ok(ExpressionStatement { expr })
+    }
+
     fn parse_identifier(&mut self) -> Result<Identifier> {
         match self.token {
             Some(Token::Ident(value)) => {
@@ -130,7 +140,7 @@ impl<'a> Parser<'a> {
 
 #[cfg(test)]
 mod tests {
-    use ast::StatementKind;
+    use ast::{ExpressionKind, StatementKind};
     use parser::Parser;
 
     #[test]
@@ -173,6 +183,24 @@ mod tests {
             } else {
                 panic!("it's not return");
             }
+        }
+    }
+
+    #[test]
+    fn test_identifier_expression() {
+        let input = "foobar;";
+
+        let mut p = Parser::new(input);
+        let program = p.parse_program().unwrap();
+        assert_eq!(1, program.statements.len());
+
+        if let StatementKind::Expression(stmt) = &program.statements[0].node {
+            if let ExpressionKind::Identifier(ident) = &stmt.expr.node {
+            } else {
+                panic!("not identifier");
+            }
+        } else {
+            panic!("not expression statement");
         }
     }
 }
