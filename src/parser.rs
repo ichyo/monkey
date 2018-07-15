@@ -143,6 +143,7 @@ impl<'a> Parser<'a> {
             Some(Token::True) | Some(Token::False) => self.prefix_boolean(),
             Some(Token::Bang) => self.parse_unary(),
             Some(Token::Minus) => self.parse_unary(),
+            Some(Token::LeftParen) => self.parse_grouped(),
             Some(t) => Err(format!("unknown token for prefix parse: {:?}", t).into()),
             None => Err(format!("no token found for prefix parse").into()),
         }
@@ -174,6 +175,13 @@ impl<'a> Parser<'a> {
         Ok(Expression {
             node: ExpressionKind::Unary(UnaryExpression { op, expr }),
         })
+    }
+
+    fn parse_grouped(&mut self) -> Result<Expression> {
+        self.expect(&Token::LeftParen);
+        let res = self.parse_expression();
+        self.expect(&Token::RightParen);
+        res
     }
 
     fn parse_bin(&mut self, left: Expression) -> Result<Expression> {
@@ -480,6 +488,11 @@ mod tests {
                 "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
             ),
             ("true != false == false", "((true != false) == false)"),
+            ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
+            ("(5 + 5) * 2", "((5 + 5) * 2)"),
+            ("2 / (5 + 5)", "(2 / (5 + 5))"),
+            ("-(5 + 5)", "(-(5 + 5))"),
+            ("!(true == true)", "(!(true == true))"),
         ];
         for (input, expected) in tests {
             let mut p = Parser::new(input);
