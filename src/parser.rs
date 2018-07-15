@@ -1,6 +1,5 @@
 use ast::*;
 use lexer::Lexer;
-use std::collections::HashMap;
 use std::fmt;
 use std::result;
 use token::Token;
@@ -105,10 +104,10 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expression(&mut self) -> Result<Expression> {
-        self.parse_expression_impl(Precedence::Lowest)
+        self.parse_expression_inner(Precedence::Lowest)
     }
 
-    fn parse_expression_impl(&mut self, precedence: Precedence) -> Result<Expression> {
+    fn parse_expression_inner(&mut self, precedence: Precedence) -> Result<Expression> {
         self.prefix_parse()
     }
 
@@ -116,9 +115,24 @@ impl<'a> Parser<'a> {
         match self.token {
             Some(Token::Ident(_)) => self.prefix_identifier(),
             Some(Token::Int(_)) => self.prefix_integer(),
+            Some(Token::Bang) => self.parse_unary(),
+            Some(Token::Minus) => self.parse_unary(),
             Some(t) => Err(format!("unknown token for prefix parse: {:?}", t).into()),
             None => Err(format!("no token found for prefix parse").into()),
         }
+    }
+
+    fn parse_unary(&mut self) -> Result<Expression> {
+        let op = match self.token {
+            Some(Token::Bang) => UnOp::Not,
+            Some(Token::Minus) => UnOp::Neg,
+            _ => unreachable!(),
+        };
+        self.bump();
+        let expr = Box::new(self.parse_expression_inner(Precedence::Prefix)?);
+        Ok(Expression {
+            node: ExpressionKind::Unary(UnaryExpression { op, expr }),
+        })
     }
 
     fn prefix_identifier(&mut self) -> Result<Expression> {
@@ -142,8 +156,8 @@ impl<'a> Parser<'a> {
         let expr = self.parse_expression()?;
         self.expect(&Token::Semicolon)?;
         Ok(LetStatement {
-            name: ident,
-            value: expr,
+            name: Box::new(ident),
+            value: Box::new(expr),
         })
     }
 
@@ -151,13 +165,17 @@ impl<'a> Parser<'a> {
         self.expect(&Token::Return)?;
         let expr = self.parse_expression()?;
         self.expect(&Token::Semicolon)?;
-        Ok(ReturnStatement { value: expr })
+        Ok(ReturnStatement {
+            value: Box::new(expr),
+        })
     }
 
     fn parse_expression_statement(&mut self) -> Result<ExpressionStatement> {
         let expr = self.parse_expression()?;
         self.eat(&Token::Semicolon);
-        Ok(ExpressionStatement { expr })
+        Ok(ExpressionStatement {
+            expr: Box::new(expr),
+        })
     }
 
     fn parse_identifier(&mut self) -> Result<Identifier> {
@@ -185,7 +203,7 @@ impl<'a> Parser<'a> {
 
 #[cfg(test)]
 mod tests {
-    use ast::{ExpressionKind, StatementKind};
+    use ast::{Expression, ExpressionKind, StatementKind, UnOp};
     use parser::Parser;
 
     #[test]
@@ -265,6 +283,36 @@ mod tests {
             }
         } else {
             panic!("not expression statement");
+        }
+    }
+
+    #[test]
+    fn test_parsing_unary_expressions() {
+        let prefix_tests = vec![("!5", UnOp::Not, 5), ("-15", UnOp::Neg, 15)];
+
+        for (input, operator, integer_value) in prefix_tests {
+            let mut p = Parser::new(input);
+            let program = p.parse_program().unwrap();
+            assert_eq!(1, program.statements.len());
+
+            if let StatementKind::Expression(e) = &program.statements[0].node {
+                if let ExpressionKind::Unary(p) = &e.expr.node {
+                    assert_eq!(operator, p.op);
+                    test_integer_literal(&p.expr, integer_value);
+                } else {
+                    panic!("wrong expression kind");
+                }
+            } else {
+                panic!("wrong statement kind");
+            }
+        }
+    }
+
+    fn test_integer_literal(e: &Expression, value: i64) {
+        if let ExpressionKind::IntegerLiteral(integer) = &e.node {
+            assert_eq!(value, integer.value);
+        } else {
+            panic!("wrong expression kind");
         }
     }
 }
