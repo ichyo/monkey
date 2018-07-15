@@ -213,7 +213,7 @@ mod tests {
             Token::Eof,
         ];
 
-        let mut l = Lexer::new(input);
+        let l = Lexer::new(input);
         let actual: Vec<_> = l.collect();
 
         assert_eq!(tests, actual);
@@ -270,7 +270,7 @@ let result = add(five, ten);
             Token::Eof,
         ];
 
-        let mut l = Lexer::new(input);
+        let l = Lexer::new(input);
         let mut actual: Vec<_> = l.collect();
         assert_eq!(tests, actual);
     }
@@ -331,7 +331,7 @@ let result = add(five, ten);
             Token::Eof,
         ];
 
-        let mut l = Lexer::new(input);
+        let l = Lexer::new(input);
         let mut actual: Vec<_> = l.collect();
         assert_eq!(tests, actual);
     }

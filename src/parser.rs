@@ -4,7 +4,7 @@ use std::fmt;
 use std::result;
 use token::Token;
 
-struct Parser<'a> {
+pub struct Parser<'a> {
     lexer: Lexer<'a>,
     token: Option<Token>,
 }
@@ -12,9 +12,9 @@ struct Parser<'a> {
 type Result<T> = result::Result<T, ParseError>;
 
 #[derive(Debug)]
-struct ParseError(String);
+pub struct ParseError(String);
 
-#[derive(PartialEq, PartialOrd)]
+#[derive(Clone, Copy, PartialEq, PartialOrd)]
 enum Precedence {
     Lowest,
     Equals,      // ==
@@ -23,6 +23,22 @@ enum Precedence {
     Product,     // *
     Prefix,      // -X or !X
     Call,        // myFunction(X)
+}
+
+impl Precedence {
+    fn get(token: &Token) -> Precedence {
+        match token {
+            Token::Equal => Precedence::Equals,
+            Token::NotEqual => Precedence::Equals,
+            Token::Lt => Precedence::LessGreater,
+            Token::Gt => Precedence::LessGreater,
+            Token::Plus => Precedence::Sum,
+            Token::Minus => Precedence::Sum,
+            Token::Asterisk => Precedence::Product,
+            Token::Slash => Precedence::Product,
+            _ => Precedence::Lowest,
+        }
+    }
 }
 
 impl From<String> for ParseError {
@@ -69,7 +85,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_program(&mut self) -> Result<Program> {
+    pub fn parse_program(&mut self) -> Result<Program> {
         let mut program = Program::new();
         loop {
             match self.token {
@@ -94,7 +110,7 @@ impl<'a> Parser<'a> {
                 let s = self.parse_return_statement()?;
                 Ok(StatementKind::Return(s))
             }
-            Some(tok) => {
+            Some(_) => {
                 let s = self.parse_expression_statement()?;
                 Ok(StatementKind::Expression(s))
             }
@@ -108,15 +124,39 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expression_inner(&mut self, precedence: Precedence) -> Result<Expression> {
-        self.prefix_parse()
+        let mut left = self.parse_prefix()?;
+        while let Some(token) = self.token {
+            let tok_prec = Precedence::get(&token);
+            if token != Token::Semicolon && precedence < tok_prec {
+                left = self.parse_infix(left)?;
+            } else {
+                break;
+            }
+        }
+        Ok(left)
     }
 
-    fn prefix_parse(&mut self) -> Result<Expression> {
+    fn parse_prefix(&mut self) -> Result<Expression> {
         match self.token {
             Some(Token::Ident(_)) => self.prefix_identifier(),
             Some(Token::Int(_)) => self.prefix_integer(),
             Some(Token::Bang) => self.parse_unary(),
             Some(Token::Minus) => self.parse_unary(),
+            Some(t) => Err(format!("unknown token for prefix parse: {:?}", t).into()),
+            None => Err(format!("no token found for prefix parse").into()),
+        }
+    }
+
+    fn parse_infix(&mut self, left: Expression) -> Result<Expression> {
+        match self.token {
+            Some(Token::Plus) => self.parse_bin(left),
+            Some(Token::Minus) => self.parse_bin(left),
+            Some(Token::Asterisk) => self.parse_bin(left),
+            Some(Token::Slash) => self.parse_bin(left),
+            Some(Token::Lt) => self.parse_bin(left),
+            Some(Token::Gt) => self.parse_bin(left),
+            Some(Token::Equal) => self.parse_bin(left),
+            Some(Token::NotEqual) => self.parse_bin(left),
             Some(t) => Err(format!("unknown token for prefix parse: {:?}", t).into()),
             None => Err(format!("no token found for prefix parse").into()),
         }
@@ -132,6 +172,32 @@ impl<'a> Parser<'a> {
         let expr = Box::new(self.parse_expression_inner(Precedence::Prefix)?);
         Ok(Expression {
             node: ExpressionKind::Unary(UnaryExpression { op, expr }),
+        })
+    }
+
+    fn parse_bin(&mut self, left: Expression) -> Result<Expression> {
+        let op = match self.token {
+            Some(Token::Plus) => BinOp::Add,
+            Some(Token::Minus) => BinOp::Sub,
+            Some(Token::Asterisk) => BinOp::Mul,
+            Some(Token::Slash) => BinOp::Div,
+            Some(Token::Lt) => BinOp::Lt,
+            Some(Token::Gt) => BinOp::Gt,
+            Some(Token::Equal) => BinOp::Eq,
+            Some(Token::NotEqual) => BinOp::Ne,
+            _ => unreachable!(),
+        };
+        let precedence = Precedence::get(&self.token.unwrap());
+
+        self.bump();
+
+        let right = self.parse_expression_inner(precedence)?;
+        Ok(Expression {
+            node: ExpressionKind::Bin(BinExpression {
+                op,
+                left: Box::new(left),
+                right: Box::new(right),
+            }),
         })
     }
 
@@ -203,7 +269,7 @@ impl<'a> Parser<'a> {
 
 #[cfg(test)]
 mod tests {
-    use ast::{Expression, ExpressionKind, StatementKind, UnOp};
+    use ast::*;
     use parser::Parser;
 
     #[test]
@@ -242,7 +308,7 @@ mod tests {
         assert_eq!(3, program.statements.len());
 
         for stmt in program.statements.iter() {
-            if let StatementKind::Return(stmt) = &stmt.node {
+            if let StatementKind::Return(_) = &stmt.node {
             } else {
                 panic!("it's not return");
             }
@@ -258,7 +324,7 @@ mod tests {
         assert_eq!(1, program.statements.len());
 
         if let StatementKind::Expression(stmt) = &program.statements[0].node {
-            if let ExpressionKind::Identifier(ident) = &stmt.expr.node {
+            if let ExpressionKind::Identifier(_) = &stmt.expr.node {
             } else {
                 panic!("not identifier");
             }
@@ -313,6 +379,67 @@ mod tests {
             assert_eq!(value, integer.value);
         } else {
             panic!("wrong expression kind");
+        }
+    }
+
+    #[test]
+    fn test_parsing_infix_expressions() {
+        let tests = vec![
+            ("1 + 2;", 1, BinOp::Add, 2),
+            ("1 - 2;", 1, BinOp::Sub, 2),
+            ("1 * 2;", 1, BinOp::Mul, 2),
+            ("1 / 2;", 1, BinOp::Div, 2),
+            ("1 == 2;", 1, BinOp::Eq, 2),
+            ("1 != 2;", 1, BinOp::Ne, 2),
+            ("1 < 2;", 1, BinOp::Lt, 2),
+            ("1 > 2;", 1, BinOp::Gt, 2),
+        ];
+        for (input, left, op, right) in tests {
+            let mut p = Parser::new(input);
+            let program = p.parse_program().unwrap();
+
+            assert_eq!(1, program.statements.len());
+
+            if let StatementKind::Expression(e) = &program.statements[0].node {
+                if let ExpressionKind::Bin(p) = &e.expr.node {
+                    assert_eq!(op, p.op);
+                    test_integer_literal(&p.left, left);
+                    test_integer_literal(&p.right, right);
+                } else {
+                    panic!("wrong expression kind");
+                }
+            } else {
+                panic!("wrong statement kind");
+            }
+        }
+    }
+
+    #[test]
+    fn test_operator_precedence_parsing() {
+        let tests = vec![
+            ("-a * b", "((-X0) * X1)"),
+            ("!-a", "(!(-X0))"),
+            ("a + b + c", "((X0 + X1) + X2)"),
+            ("a + b - c", "((X0 + X1) - X2)"),
+            ("a * b * c", "((X0 * X1) * X2)"),
+            ("a * b / c", "((X0 * X1) / X2)"),
+            ("a + b / c", "(X0 + (X1 / X2))"),
+            (
+                "a + b * c + d / e - f",
+                "(((X0 + (X1 * X2)) + (X3 / X4)) - X5)",
+            ),
+            ("3 + 4; -5 * 5", "(3 + 4)\n((-5) * 5)"),
+            ("5 > 4 == 3 < 4", "((5 > 4) == (3 < 4))"),
+            ("5 > 4 != 3 < 4", "((5 > 4) != (3 < 4))"),
+            (
+                "3 + 4 * 5 == 3 * 1 + 4 * 5",
+                "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+            ),
+        ];
+        for (input, expected) in tests {
+            let mut p = Parser::new(input);
+            let program = p.parse_program().unwrap();
+            assert_eq!(expected, program.code());
         }
     }
 }

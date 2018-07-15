@@ -1,4 +1,4 @@
-trait Code {
+pub trait Code {
     fn code(&self) -> String;
 }
 
@@ -77,7 +77,7 @@ pub struct ExpressionStatement {
 
 impl Code for ExpressionStatement {
     fn code(&self) -> String {
-        format!("{};", self.expr.code())
+        format!("{}", self.expr.code())
     }
 }
 
@@ -103,6 +103,7 @@ impl Code for Expression {
             ExpressionKind::Identifier(x) => x.code(),
             ExpressionKind::IntegerLiteral(x) => x.code(),
             ExpressionKind::Unary(x) => x.code(),
+            ExpressionKind::Bin(x) => x.code(),
         }
     }
 }
@@ -112,6 +113,7 @@ pub enum ExpressionKind {
     Identifier(Identifier),
     IntegerLiteral(IntegerLiteral),
     Unary(UnaryExpression),
+    Bin(BinExpression),
 }
 
 #[derive(Debug)]
@@ -141,14 +143,59 @@ impl UnOp {
 }
 
 #[derive(Debug)]
-t pub struct UnaryExpression {
+pub struct UnaryExpression {
     pub op: UnOp,
     pub expr: Box<Expression>,
 }
 
 impl Code for UnaryExpression {
     fn code(&self) -> String {
-        format!("{}{}", UnOp::to_string(self.op), self.expr.code())
+        format!("({}{})", UnOp::to_string(self.op), self.expr.code())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BinOp {
+    Add, // +
+    Sub, // -
+    Mul, // *
+    Div, // /
+    Lt,  // <
+    Gt,  // >
+    Ne,  // !=
+    Eq,  // ==
+}
+
+impl BinOp {
+    pub fn to_string(op: BinOp) -> &'static str {
+        match op {
+            BinOp::Add => "+",
+            BinOp::Sub => "-",
+            BinOp::Mul => "*",
+            BinOp::Div => "/",
+            BinOp::Lt => "<",
+            BinOp::Gt => ">",
+            BinOp::Ne => "!=",
+            BinOp::Eq => "==",
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct BinExpression {
+    pub op: BinOp,
+    pub left: Box<Expression>,
+    pub right: Box<Expression>,
+}
+
+impl Code for BinExpression {
+    fn code(&self) -> String {
+        format!(
+            "({} {} {})",
+            self.left.code(),
+            BinOp::to_string(self.op),
+            self.right.code()
+        )
     }
 }
 
