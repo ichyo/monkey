@@ -271,7 +271,7 @@ let result = add(five, ten);
         ];
 
         let l = Lexer::new(input);
-        let mut actual: Vec<_> = l.collect();
+        let actual: Vec<_> = l.collect();
         assert_eq!(tests, actual);
     }
 
@@ -332,7 +332,7 @@ let result = add(five, ten);
         ];
 
         let l = Lexer::new(input);
-        let mut actual: Vec<_> = l.collect();
+        let actual: Vec<_> = l.collect();
         assert_eq!(tests, actual);
     }
 }

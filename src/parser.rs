@@ -127,7 +127,7 @@ impl<'a> Parser<'a> {
         let mut left = self.parse_prefix()?;
         while let Some(token) = self.token {
             let tok_prec = Precedence::get(&token);
-            if token != Token::Semicolon && precedence < tok_prec {
+            if precedence < tok_prec {
                 left = self.parse_infix(left)?;
             } else {
                 break;

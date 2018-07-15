@@ -202,6 +202,7 @@ impl Code for BinExpression {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
     fn test_code() {
         let program = Program {
             statements: vec![
@@ -222,6 +223,6 @@ mod tests {
                 },
             ],
         };
-        assert_eq!("let X1 = X2;\nreturn X1", program.code());
+        assert_eq!("let X1 = X2;\nreturn X1;", program.code());
     }
 }
