@@ -102,6 +102,7 @@ impl Code for Expression {
         match &self.node {
             ExpressionKind::Identifier(x) => x.code(),
             ExpressionKind::IntegerLiteral(x) => x.code(),
+            ExpressionKind::BooleanLiteral(x) => x.code(),
             ExpressionKind::Unary(x) => x.code(),
             ExpressionKind::Bin(x) => x.code(),
         }
@@ -112,6 +113,7 @@ impl Code for Expression {
 pub enum ExpressionKind {
     Identifier(Identifier),
     IntegerLiteral(IntegerLiteral),
+    BooleanLiteral(BooleanLiteral),
     Unary(UnaryExpression),
     Bin(BinExpression),
 }
@@ -124,6 +126,17 @@ pub struct IntegerLiteral {
 impl Code for IntegerLiteral {
     fn code(&self) -> String {
         format!("{}", self.value)
+    }
+}
+
+#[derive(Debug)]
+pub struct BooleanLiteral {
+    pub value: bool,
+}
+
+impl Code for BooleanLiteral {
+    fn code(&self) -> String {
+        format!("{}", if self.value { "true" } else { "false" })
     }
 }
 

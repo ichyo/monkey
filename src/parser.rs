@@ -140,6 +140,7 @@ impl<'a> Parser<'a> {
         match self.token {
             Some(Token::Ident(_)) => self.prefix_identifier(),
             Some(Token::Int(_)) => self.prefix_integer(),
+            Some(Token::True) | Some(Token::False) => self.prefix_boolean(),
             Some(Token::Bang) => self.parse_unary(),
             Some(Token::Minus) => self.parse_unary(),
             Some(t) => Err(format!("unknown token for prefix parse: {:?}", t).into()),
@@ -215,6 +216,13 @@ impl<'a> Parser<'a> {
         })
     }
 
+    fn prefix_boolean(&mut self) -> Result<Expression> {
+        let boolean = self.parse_boolean()?;
+        Ok(Expression {
+            node: ExpressionKind::BooleanLiteral(boolean),
+        })
+    }
+
     fn parse_let_statement(&mut self) -> Result<LetStatement> {
         self.expect(&Token::Let)?;
         let ident = self.parse_identifier()?;
@@ -260,6 +268,21 @@ impl<'a> Parser<'a> {
             Some(Token::Int(value)) => {
                 self.bump();
                 Ok(IntegerLiteral { value })
+            }
+            Some(tok) => Err(format!("[integer] unexpected token: {:?}", tok).into()),
+            None => Err(format!("[integer] no token found").into()),
+        }
+    }
+
+    fn parse_boolean(&mut self) -> Result<BooleanLiteral> {
+        match self.token {
+            Some(Token::True) => {
+                self.bump();
+                Ok(BooleanLiteral { value: true })
+            }
+            Some(Token::False) => {
+                self.bump();
+                Ok(BooleanLiteral { value: false })
             }
             Some(tok) => Err(format!("[integer] unexpected token: {:?}", tok).into()),
             None => Err(format!("[integer] no token found").into()),
@@ -345,10 +368,31 @@ mod tests {
             if let ExpressionKind::IntegerLiteral(integer) = &stmt.expr.node {
                 assert_eq!(300, integer.value);
             } else {
-                panic!("not identifier");
+                panic!("not integer");
             }
         } else {
             panic!("not expression statement");
+        }
+    }
+
+    #[test]
+    fn test_boolean_expression() {
+        let tests = vec![("true;", true), ("false;", false)];
+
+        for (input, value) in tests {
+            let mut p = Parser::new(input);
+            let program = p.parse_program().unwrap();
+            assert_eq!(1, program.statements.len());
+
+            if let StatementKind::Expression(stmt) = &program.statements[0].node {
+                if let ExpressionKind::BooleanLiteral(b) = &stmt.expr.node {
+                    assert_eq!(value, b.value);
+                } else {
+                    panic!("not boolean");
+                }
+            } else {
+                panic!("not expression statement");
+            }
         }
     }
 
@@ -435,6 +479,7 @@ mod tests {
                 "3 + 4 * 5 == 3 * 1 + 4 * 5",
                 "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
             ),
+            ("true != false == false", "((true != false) == false)"),
         ];
         for (input, expected) in tests {
             let mut p = Parser::new(input);
