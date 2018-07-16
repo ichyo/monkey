@@ -1,4 +1,5 @@
-use lexer::Lexer;
+use ast::Code;
+use parser::Parser;
 use std::io::prelude::*;
 use std::io::BufReader;
 
@@ -11,9 +12,10 @@ pub fn start<R: Read, W: Write>(input: R, mut output: W) {
         output.flush().unwrap();
         let mut line = String::new();
         reader.read_line(&mut line).unwrap();
-        let l = Lexer::new(&line);
-        for tok in l {
-            writeln!(output, "{:?}", tok).unwrap();
+        let mut p = Parser::new(&line);
+        match p.parse_program() {
+            Ok(program) => println!("{}", program.code()),
+            Err(e) => println!("{}", e),
         }
     }
 }

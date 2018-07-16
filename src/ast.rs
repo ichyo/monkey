@@ -89,7 +89,7 @@ pub struct BlockStatement {
 impl Code for BlockStatement {
     fn code(&self) -> String {
         format!(
-            "{{\n{}\n}}",
+            "{{ {} }}",
             self.statements
                 .iter()
                 .map(|s| s.code())
