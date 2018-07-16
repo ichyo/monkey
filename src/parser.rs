@@ -138,12 +138,13 @@ impl<'a> Parser<'a> {
 
     fn parse_prefix(&mut self) -> Result<Expression> {
         match self.token {
-            Some(Token::Ident(_)) => self.prefix_identifier(),
-            Some(Token::Int(_)) => self.prefix_integer(),
-            Some(Token::True) | Some(Token::False) => self.prefix_boolean(),
-            Some(Token::Bang) => self.parse_unary(),
-            Some(Token::Minus) => self.parse_unary(),
-            Some(Token::LeftParen) => self.parse_grouped(),
+            Some(Token::Ident(_)) => self.parse_identifier_expr(),
+            Some(Token::Int(_)) => self.parse_integer_expr(),
+            Some(Token::True) | Some(Token::False) => self.parse_boolean_expr(),
+            Some(Token::Bang) => self.parse_unary_expr(),
+            Some(Token::Minus) => self.parse_unary_expr(),
+            Some(Token::LeftParen) => self.parse_grouped_expr(),
+            Some(Token::If) => self.parse_if_expr(),
             Some(t) => Err(format!("unknown token for prefix parse: {:?}", t).into()),
             None => Err(format!("no token found for prefix parse").into()),
         }
@@ -151,20 +152,20 @@ impl<'a> Parser<'a> {
 
     fn parse_infix(&mut self, left: Expression) -> Result<Expression> {
         match self.token {
-            Some(Token::Plus) => self.parse_bin(left),
-            Some(Token::Minus) => self.parse_bin(left),
-            Some(Token::Asterisk) => self.parse_bin(left),
-            Some(Token::Slash) => self.parse_bin(left),
-            Some(Token::Lt) => self.parse_bin(left),
-            Some(Token::Gt) => self.parse_bin(left),
-            Some(Token::Equal) => self.parse_bin(left),
-            Some(Token::NotEqual) => self.parse_bin(left),
+            Some(Token::Plus) => self.parse_bin_expr(left),
+            Some(Token::Minus) => self.parse_bin_expr(left),
+            Some(Token::Asterisk) => self.parse_bin_expr(left),
+            Some(Token::Slash) => self.parse_bin_expr(left),
+            Some(Token::Lt) => self.parse_bin_expr(left),
+            Some(Token::Gt) => self.parse_bin_expr(left),
+            Some(Token::Equal) => self.parse_bin_expr(left),
+            Some(Token::NotEqual) => self.parse_bin_expr(left),
             Some(t) => Err(format!("unknown token for prefix parse: {:?}", t).into()),
             None => Err(format!("no token found for prefix parse").into()),
         }
     }
 
-    fn parse_unary(&mut self) -> Result<Expression> {
+    fn parse_unary_expr(&mut self) -> Result<Expression> {
         let op = match self.token {
             Some(Token::Bang) => UnOp::Not,
             Some(Token::Minus) => UnOp::Neg,
@@ -177,14 +178,14 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_grouped(&mut self) -> Result<Expression> {
-        self.expect(&Token::LeftParen);
+    fn parse_grouped_expr(&mut self) -> Result<Expression> {
+        self.expect(&Token::LeftParen)?;
         let res = self.parse_expression();
-        self.expect(&Token::RightParen);
+        self.expect(&Token::RightParen)?;
         res
     }
 
-    fn parse_bin(&mut self, left: Expression) -> Result<Expression> {
+    fn parse_bin_expr(&mut self, left: Expression) -> Result<Expression> {
         let op = match self.token {
             Some(Token::Plus) => BinOp::Add,
             Some(Token::Minus) => BinOp::Sub,
@@ -210,25 +211,60 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn prefix_identifier(&mut self) -> Result<Expression> {
+    fn parse_identifier_expr(&mut self) -> Result<Expression> {
         let ident = self.parse_identifier()?;
         Ok(Expression {
             node: ExpressionKind::Identifier(ident),
         })
     }
 
-    fn prefix_integer(&mut self) -> Result<Expression> {
+    fn parse_integer_expr(&mut self) -> Result<Expression> {
         let integer = self.parse_integer()?;
         Ok(Expression {
             node: ExpressionKind::IntegerLiteral(integer),
         })
     }
 
-    fn prefix_boolean(&mut self) -> Result<Expression> {
+    fn parse_boolean_expr(&mut self) -> Result<Expression> {
         let boolean = self.parse_boolean()?;
         Ok(Expression {
             node: ExpressionKind::BooleanLiteral(boolean),
         })
+    }
+
+    fn parse_if_expr(&mut self) -> Result<Expression> {
+        self.expect(&Token::If)?;
+        self.expect(&Token::LeftParen)?;
+        let cond = Box::new(self.parse_expression()?);
+        self.expect(&Token::RightParen)?;
+        let cons = Box::new(self.parse_block_statement()?);
+        let alt = if self.eat(&Token::Else) {
+            Some(Box::new(self.parse_block_statement()?))
+        } else {
+            None
+        };
+        Ok(Expression {
+            node: ExpressionKind::If(IfExpression { cond, cons, alt }),
+        })
+    }
+
+    fn parse_block_statement(&mut self) -> Result<BlockStatement> {
+        self.expect(&Token::LeftBrace)?;
+        let mut statements = Vec::new();
+        loop {
+            match self.token {
+                Some(Token::RightBrace) | Some(Token::Eof) | None => break,
+                _ => {
+                    let stmt = self.parse_statement()?;
+                    statements.push(stmt);
+                }
+            }
+        }
+        if self.eat(&Token::RightBrace) {
+            Ok(BlockStatement { statements })
+        } else {
+            Err(format!("unintened EOF before right brace").into())
+        }
     }
 
     fn parse_let_statement(&mut self) -> Result<LetStatement> {
@@ -416,7 +452,7 @@ mod tests {
             if let StatementKind::Expression(e) = &program.statements[0].node {
                 if let ExpressionKind::Unary(p) = &e.expr.node {
                     assert_eq!(operator, p.op);
-                    test_integer_literal(&p.expr, integer_value);
+                    check_integer_literal(&p.expr, integer_value);
                 } else {
                     panic!("wrong expression kind");
                 }
@@ -426,11 +462,21 @@ mod tests {
         }
     }
 
-    fn test_integer_literal(e: &Expression, value: i64) {
+    fn check_integer_literal(e: &Expression, value: i64) {
         if let ExpressionKind::IntegerLiteral(integer) = &e.node {
             assert_eq!(value, integer.value);
         } else {
             panic!("wrong expression kind");
+        }
+    }
+
+    fn check_bin_expression(e: &Expression, op: &BinOp, left: &str, right: &str) {
+        if let ExpressionKind::Bin(e) = &e.node {
+            assert_eq!(op, &e.op);
+            assert_eq!(left, e.left.code());
+            assert_eq!(right, e.right.code());
+        } else {
+            panic!("not bin expression");
         }
     }
 
@@ -455,14 +501,64 @@ mod tests {
             if let StatementKind::Expression(e) = &program.statements[0].node {
                 if let ExpressionKind::Bin(p) = &e.expr.node {
                     assert_eq!(op, p.op);
-                    test_integer_literal(&p.left, left);
-                    test_integer_literal(&p.right, right);
+                    check_integer_literal(&p.left, left);
+                    check_integer_literal(&p.right, right);
                 } else {
                     panic!("wrong expression kind");
                 }
             } else {
                 panic!("wrong statement kind");
             }
+        }
+    }
+
+    #[test]
+    fn test_if_expression() {
+        let input = r"if (1 < 2) { x }";
+
+        let mut p = Parser::new(input);
+        let program = p.parse_program().unwrap();
+
+        assert_eq!(1, program.statements.len());
+        let stmt = &program.statements[0];
+
+        if let StatementKind::Expression(stmt) = &stmt.node {
+            if let ExpressionKind::If(if_expr) = &stmt.expr.node {
+                check_bin_expression(&if_expr.cond, &BinOp::Lt, "1", "2");
+                assert_eq!(1, if_expr.cons.statements.len());
+                assert!(if_expr.alt.is_none());
+            } else {
+                panic!("it's not if expression");
+            }
+        } else {
+            panic!("it's not expression");
+        }
+    }
+
+    #[test]
+    fn test_if_else_expression() {
+        let input = r"if (1 < 2) { x } else { 1; 2 }";
+
+        let mut p = Parser::new(input);
+        let program = p.parse_program().unwrap();
+
+        assert_eq!(1, program.statements.len());
+        let stmt = &program.statements[0];
+
+        if let StatementKind::Expression(stmt) = &stmt.node {
+            if let ExpressionKind::If(if_expr) = &stmt.expr.node {
+                check_bin_expression(&if_expr.cond, &BinOp::Lt, "1", "2");
+                assert_eq!(1, if_expr.cons.statements.len());
+                if let Some(alt) = &if_expr.alt {
+                    assert_eq!(2, alt.statements.len());
+                } else {
+                    panic!("not alt");
+                }
+            } else {
+                panic!("it's not if expression");
+            }
+        } else {
+            panic!("it's not expression");
         }
     }
 

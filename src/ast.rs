@@ -82,6 +82,21 @@ impl Code for ExpressionStatement {
 }
 
 #[derive(Debug)]
+pub struct BlockStatement {
+    pub statements: Vec<Statement>,
+}
+
+impl Code for BlockStatement {
+    fn code(&self) -> String {
+        self.statements
+            .iter()
+            .map(|s| s.code())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+}
+
+#[derive(Debug)]
 pub struct Identifier {
     pub value: u32,
 }
@@ -105,6 +120,7 @@ impl Code for Expression {
             ExpressionKind::BooleanLiteral(x) => x.code(),
             ExpressionKind::Unary(x) => x.code(),
             ExpressionKind::Bin(x) => x.code(),
+            ExpressionKind::If(x) => x.code(),
         }
     }
 }
@@ -116,6 +132,7 @@ pub enum ExpressionKind {
     BooleanLiteral(BooleanLiteral),
     Unary(UnaryExpression),
     Bin(BinExpression),
+    If(IfExpression),
 }
 
 #[derive(Debug)]
@@ -164,6 +181,27 @@ pub struct UnaryExpression {
 impl Code for UnaryExpression {
     fn code(&self) -> String {
         format!("({}{})", UnOp::to_string(self.op), self.expr.code())
+    }
+}
+
+#[derive(Debug)]
+pub struct IfExpression {
+    pub cond: Box<Expression>,
+    pub cons: Box<BlockStatement>,
+    pub alt: Option<Box<BlockStatement>>,
+}
+
+impl Code for IfExpression {
+    fn code(&self) -> String {
+        match &self.alt {
+            Some(alt) => format!(
+                "if {} {} else {}",
+                self.cond.code(),
+                self.cons.code(),
+                alt.code()
+            ),
+            None => format!("if {} {}", self.cond.code(), self.cons.code()),
+        }
     }
 }
 
