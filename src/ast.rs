@@ -125,6 +125,7 @@ impl Code for Expression {
             ExpressionKind::Bin(x) => x.code(),
             ExpressionKind::If(x) => x.code(),
             ExpressionKind::Func(x) => x.code(),
+            ExpressionKind::Call(x) => x.code(),
         }
     }
 }
@@ -138,6 +139,7 @@ pub enum ExpressionKind {
     Bin(BinExpression),
     If(IfExpression),
     Func(FunctionalLiteral),
+    Call(CallExpression),
 }
 
 #[derive(Debug)]
@@ -271,6 +273,26 @@ impl Code for BinExpression {
             self.left.code(),
             BinOp::to_string(self.op),
             self.right.code()
+        )
+    }
+}
+
+#[derive(Debug)]
+pub struct CallExpression {
+    pub func: Box<Expression>,
+    pub args: Vec<Expression>,
+}
+
+impl Code for CallExpression {
+    fn code(&self) -> String {
+        format!(
+            "{}({})",
+            self.func.code(),
+            self.args
+                .iter()
+                .map(|x| x.code())
+                .collect::<Vec<_>>()
+                .join(", "),
         )
     }
 }

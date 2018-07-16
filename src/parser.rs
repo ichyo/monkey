@@ -36,6 +36,7 @@ impl Precedence {
             Token::Minus => Precedence::Sum,
             Token::Asterisk => Precedence::Product,
             Token::Slash => Precedence::Product,
+            Token::LeftParen => Precedence::Call,
             _ => Precedence::Lowest,
         }
     }
@@ -161,6 +162,7 @@ impl<'a> Parser<'a> {
             Some(Token::Gt) => self.parse_bin_expr(left),
             Some(Token::Equal) => self.parse_bin_expr(left),
             Some(Token::NotEqual) => self.parse_bin_expr(left),
+            Some(Token::LeftParen) => self.parse_call_expr(left),
             Some(t) => Err(format!("unknown token for prefix parse: {:?}", t).into()),
             None => Err(format!("no token found for prefix parse").into()),
         }
@@ -247,6 +249,30 @@ impl<'a> Parser<'a> {
         Ok(Expression {
             node: ExpressionKind::If(IfExpression { cond, cons, alt }),
         })
+    }
+
+    fn parse_call_expr(&mut self, func: Expression) -> Result<Expression> {
+        let func = Box::new(func);
+        let args = self.parse_call_args()?;
+        Ok(Expression {
+            node: ExpressionKind::Call(CallExpression { func, args }),
+        })
+    }
+
+    fn parse_call_args(&mut self) -> Result<Vec<Expression>> {
+        self.expect(&Token::LeftParen);
+        let mut args = Vec::new();
+        while let Some(token) = self.token {
+            if token == Token::Eof || token == Token::RightParen {
+                break;
+            }
+            if !args.is_empty() {
+                self.expect(&Token::Comma)?;
+            }
+            args.push(self.parse_expression()?);
+        }
+        self.expect(&Token::RightParen)?;
+        Ok(args)
     }
 
     fn parse_block_statement(&mut self) -> Result<BlockStatement> {
@@ -648,6 +674,7 @@ mod tests {
             ("2 / (5 + 5)", "(2 / (5 + 5))"),
             ("-(5 + 5)", "(-(5 + 5))"),
             ("!(true == true)", "(!(true == true))"),
+            ("1 + add(2 * (3 + 4)) + 5", "((1 + X0((2 * (3 + 4)))) + 5)"),
         ];
         for (input, expected) in tests {
             let mut p = Parser::new(input);
