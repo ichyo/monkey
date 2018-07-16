@@ -145,6 +145,7 @@ impl<'a> Parser<'a> {
             Some(Token::Minus) => self.parse_unary_expr(),
             Some(Token::LeftParen) => self.parse_grouped_expr(),
             Some(Token::If) => self.parse_if_expr(),
+            Some(Token::Function) => self.parse_function_literal(),
             Some(t) => Err(format!("unknown token for prefix parse: {:?}", t).into()),
             None => Err(format!("no token found for prefix parse").into()),
         }
@@ -265,6 +266,31 @@ impl<'a> Parser<'a> {
         } else {
             Err(format!("unintened EOF before right brace").into())
         }
+    }
+
+    fn parse_function_literal(&mut self) -> Result<Expression> {
+        self.expect(&Token::Function)?;
+        let params = self.parse_function_params()?;
+        let body = Box::new(self.parse_block_statement()?);
+        Ok(Expression {
+            node: ExpressionKind::Func(FunctionalLiteral { params, body }),
+        })
+    }
+
+    fn parse_function_params(&mut self) -> Result<Vec<Identifier>> {
+        let mut params = Vec::new();
+        self.expect(&Token::LeftParen)?;
+        while let Some(token) = self.token {
+            if token == Token::Eof || token == Token::RightParen {
+                break;
+            }
+            if !params.is_empty() {
+                self.expect(&Token::Comma)?;
+            }
+            params.push(self.parse_identifier()?);
+        }
+        self.expect(&Token::RightParen)?;
+        Ok(params)
     }
 
     fn parse_let_statement(&mut self) -> Result<LetStatement> {
@@ -559,6 +585,39 @@ mod tests {
             }
         } else {
             panic!("it's not expression");
+        }
+    }
+
+    #[test]
+    fn test_function_literal() {
+        let tests = vec![
+            ("fn(x, y) { 1 + 2; }", 2),
+            ("fn() { 1 + 2; }", 0),
+            ("fn(x) { 1 + 2; }", 1),
+        ];
+
+        for (input, p_len) in tests {
+            let mut p = Parser::new(input);
+            let program = p.parse_program().unwrap();
+
+            assert_eq!(1, program.statements.len());
+            let stmt = &program.statements[0];
+
+            if let StatementKind::Expression(stmt) = &stmt.node {
+                if let ExpressionKind::Func(fn_expr) = &stmt.expr.node {
+                    assert_eq!(p_len, fn_expr.params.len());
+                    assert_eq!(1, fn_expr.body.statements.len());
+                    if let StatementKind::Expression(expr) = &fn_expr.body.statements[0].node {
+                        check_bin_expression(&expr.expr, &BinOp::Add, "1", "2");
+                    } else {
+                        panic!("not expression");
+                    }
+                } else {
+                    panic!("it's not if expression");
+                }
+            } else {
+                panic!("it's not expression");
+            }
         }
     }
 

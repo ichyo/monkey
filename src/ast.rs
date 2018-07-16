@@ -88,11 +88,14 @@ pub struct BlockStatement {
 
 impl Code for BlockStatement {
     fn code(&self) -> String {
-        self.statements
-            .iter()
-            .map(|s| s.code())
-            .collect::<Vec<_>>()
-            .join("\n")
+        format!(
+            "{{\n{}\n}}",
+            self.statements
+                .iter()
+                .map(|s| s.code())
+                .collect::<Vec<_>>()
+                .join("\n")
+        )
     }
 }
 
@@ -121,6 +124,7 @@ impl Code for Expression {
             ExpressionKind::Unary(x) => x.code(),
             ExpressionKind::Bin(x) => x.code(),
             ExpressionKind::If(x) => x.code(),
+            ExpressionKind::Func(x) => x.code(),
         }
     }
 }
@@ -133,6 +137,7 @@ pub enum ExpressionKind {
     Unary(UnaryExpression),
     Bin(BinExpression),
     If(IfExpression),
+    Func(FunctionalLiteral),
 }
 
 #[derive(Debug)]
@@ -154,6 +159,26 @@ pub struct BooleanLiteral {
 impl Code for BooleanLiteral {
     fn code(&self) -> String {
         format!("{}", if self.value { "true" } else { "false" })
+    }
+}
+
+#[derive(Debug)]
+pub struct FunctionalLiteral {
+    pub params: Vec<Identifier>,
+    pub body: Box<BlockStatement>,
+}
+
+impl Code for FunctionalLiteral {
+    fn code(&self) -> String {
+        format!(
+            "fn ({}) {}",
+            self.params
+                .iter()
+                .map(|x| x.code())
+                .collect::<Vec<_>>()
+                .join(", "),
+            self.body.code()
+        )
     }
 }
 
