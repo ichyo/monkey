@@ -3,11 +3,11 @@ pub trait Code {
 }
 
 #[derive(Debug)]
-pub struct Program {
-    pub statements: Vec<Statement>,
+pub struct Program<'a> {
+    pub statements: Vec<Statement<'a>>,
 }
 
-impl Code for Program {
+impl<'a> Code for Program<'a> {
     fn code(&self) -> String {
         self.statements
             .iter()
@@ -17,8 +17,8 @@ impl Code for Program {
     }
 }
 
-impl Program {
-    pub fn new() -> Program {
+impl<'a> Program<'a> {
+    pub fn new() -> Program<'a> {
         Program {
             statements: Vec::new(),
         }
@@ -26,11 +26,11 @@ impl Program {
 }
 
 #[derive(Debug)]
-pub struct Statement {
-    pub node: StatementKind,
+pub struct Statement<'a> {
+    pub node: StatementKind<'a>,
 }
 
-impl Code for Statement {
+impl<'a> Code for Statement<'a> {
     fn code(&self) -> String {
         match &self.node {
             StatementKind::Let(stmt) => stmt.code(),
@@ -41,52 +41,52 @@ impl Code for Statement {
 }
 
 #[derive(Debug)]
-pub enum StatementKind {
-    Let(LetStatement),
-    Return(ReturnStatement),
-    Expression(ExpressionStatement),
+pub enum StatementKind<'a> {
+    Let(LetStatement<'a>),
+    Return(ReturnStatement<'a>),
+    Expression(ExpressionStatement<'a>),
 }
 
 #[derive(Debug)]
-pub struct LetStatement {
-    pub name: Box<Identifier>,
-    pub value: Box<Expression>,
+pub struct LetStatement<'a> {
+    pub name: Box<Identifier<'a>>,
+    pub value: Box<Expression<'a>>,
 }
 
-impl Code for LetStatement {
+impl<'a> Code for LetStatement<'a> {
     fn code(&self) -> String {
         format!("let {} = {};", self.name.code(), self.value.code())
     }
 }
 
 #[derive(Debug)]
-pub struct ReturnStatement {
-    pub value: Box<Expression>,
+pub struct ReturnStatement<'a> {
+    pub value: Box<Expression<'a>>,
 }
 
-impl Code for ReturnStatement {
+impl<'a> Code for ReturnStatement<'a> {
     fn code(&self) -> String {
         format!("return {};", self.value.code())
     }
 }
 
 #[derive(Debug)]
-pub struct ExpressionStatement {
-    pub expr: Box<Expression>,
+pub struct ExpressionStatement<'a> {
+    pub expr: Box<Expression<'a>>,
 }
 
-impl Code for ExpressionStatement {
+impl<'a> Code for ExpressionStatement<'a> {
     fn code(&self) -> String {
         format!("{}", self.expr.code())
     }
 }
 
 #[derive(Debug)]
-pub struct BlockStatement {
-    pub statements: Vec<Statement>,
+pub struct BlockStatement<'a> {
+    pub statements: Vec<Statement<'a>>,
 }
 
-impl Code for BlockStatement {
+impl<'a> Code for BlockStatement<'a> {
     fn code(&self) -> String {
         format!(
             "{{ {} }}",
@@ -100,22 +100,22 @@ impl Code for BlockStatement {
 }
 
 #[derive(Debug)]
-pub struct Identifier {
-    pub value: u32,
+pub struct Identifier<'a> {
+    pub value: &'a str,
 }
 
-impl Code for Identifier {
+impl<'a> Code for Identifier<'a> {
     fn code(&self) -> String {
-        format!("X{}", self.value)
+        format!("{}", self.value)
     }
 }
 
 #[derive(Debug)]
-pub struct Expression {
-    pub node: ExpressionKind,
+pub struct Expression<'a> {
+    pub node: ExpressionKind<'a>,
 }
 
-impl Code for Expression {
+impl<'a> Code for Expression<'a> {
     fn code(&self) -> String {
         match &self.node {
             ExpressionKind::Identifier(x) => x.code(),
@@ -131,15 +131,15 @@ impl Code for Expression {
 }
 
 #[derive(Debug)]
-pub enum ExpressionKind {
-    Identifier(Identifier),
+pub enum ExpressionKind<'a> {
+    Identifier(Identifier<'a>),
     IntegerLiteral(IntegerLiteral),
     BooleanLiteral(BooleanLiteral),
-    Unary(UnaryExpression),
-    Bin(BinExpression),
-    If(IfExpression),
-    Func(FunctionalLiteral),
-    Call(CallExpression),
+    Unary(UnaryExpression<'a>),
+    Bin(BinExpression<'a>),
+    If(IfExpression<'a>),
+    Func(FunctionalLiteral<'a>),
+    Call(CallExpression<'a>),
 }
 
 #[derive(Debug)]
@@ -165,12 +165,12 @@ impl Code for BooleanLiteral {
 }
 
 #[derive(Debug)]
-pub struct FunctionalLiteral {
-    pub params: Vec<Identifier>,
-    pub body: Box<BlockStatement>,
+pub struct FunctionalLiteral<'a> {
+    pub params: Vec<Identifier<'a>>,
+    pub body: Box<BlockStatement<'a>>,
 }
 
-impl Code for FunctionalLiteral {
+impl<'a> Code for FunctionalLiteral<'a> {
     fn code(&self) -> String {
         format!(
             "fn ({}) {}",
@@ -200,25 +200,25 @@ impl UnOp {
 }
 
 #[derive(Debug)]
-pub struct UnaryExpression {
+pub struct UnaryExpression<'a> {
     pub op: UnOp,
-    pub expr: Box<Expression>,
+    pub expr: Box<Expression<'a>>,
 }
 
-impl Code for UnaryExpression {
+impl<'a> Code for UnaryExpression<'a> {
     fn code(&self) -> String {
         format!("({}{})", UnOp::to_string(self.op), self.expr.code())
     }
 }
 
 #[derive(Debug)]
-pub struct IfExpression {
-    pub cond: Box<Expression>,
-    pub cons: Box<BlockStatement>,
-    pub alt: Option<Box<BlockStatement>>,
+pub struct IfExpression<'a> {
+    pub cond: Box<Expression<'a>>,
+    pub cons: Box<BlockStatement<'a>>,
+    pub alt: Option<Box<BlockStatement<'a>>>,
 }
 
-impl Code for IfExpression {
+impl<'a> Code for IfExpression<'a> {
     fn code(&self) -> String {
         match &self.alt {
             Some(alt) => format!(
@@ -260,13 +260,13 @@ impl BinOp {
 }
 
 #[derive(Debug)]
-pub struct BinExpression {
+pub struct BinExpression<'a> {
     pub op: BinOp,
-    pub left: Box<Expression>,
-    pub right: Box<Expression>,
+    pub left: Box<Expression<'a>>,
+    pub right: Box<Expression<'a>>,
 }
 
-impl Code for BinExpression {
+impl<'a> Code for BinExpression<'a> {
     fn code(&self) -> String {
         format!(
             "({} {} {})",
@@ -278,12 +278,12 @@ impl Code for BinExpression {
 }
 
 #[derive(Debug)]
-pub struct CallExpression {
-    pub func: Box<Expression>,
-    pub args: Vec<Expression>,
+pub struct CallExpression<'a> {
+    pub func: Box<Expression<'a>>,
+    pub args: Vec<Expression<'a>>,
 }
 
-impl Code for CallExpression {
+impl<'a> Code for CallExpression<'a> {
     fn code(&self) -> String {
         format!(
             "{}({})",
@@ -306,21 +306,21 @@ mod tests {
             statements: vec![
                 Statement {
                     node: StatementKind::Let(LetStatement {
-                        name: Box::new(Identifier { value: 1 }),
+                        name: Box::new(Identifier { value: "x" }),
                         value: Box::new(Expression {
-                            node: ExpressionKind::Identifier(Identifier { value: 2 }),
+                            node: ExpressionKind::Identifier(Identifier { value: "y" }),
                         }),
                     }),
                 },
                 Statement {
                     node: StatementKind::Return(ReturnStatement {
                         value: Box::new(Expression {
-                            node: ExpressionKind::Identifier(Identifier { value: 1 }),
+                            node: ExpressionKind::Identifier(Identifier { value: "x" }),
                         }),
                     }),
                 },
             ],
         };
-        assert_eq!("let X1 = X2;\nreturn X1;", program.code());
+        assert_eq!("let x = y;\nreturn x;", program.code());
     }
 }

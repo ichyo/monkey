@@ -1,31 +1,35 @@
 use std::collections::HashMap;
-use std::str::Chars;
+use std::str::{from_utf8, CharIndices};
 use token::Token;
 
 pub struct Lexer<'a> {
-    input: Chars<'a>,
+    chars: CharIndices<'a>,
+    bytes: &'a [u8],
     ch: Option<char>,
+    offset: Option<usize>,
     eof: bool,
-    dict: HashMap<String, u32>,
 }
 
 impl<'a> Lexer<'a> {
     pub fn new(input: &str) -> Lexer {
         let mut l = Lexer {
-            input: input.chars(),
+            chars: input.char_indices(),
+            bytes: input.as_bytes(),
             ch: None,
+            offset: None,
             eof: false,
-            dict: HashMap::new(),
         };
         l.read_char();
         l
     }
 
     fn read_char(&mut self) {
-        self.ch = self.input.next()
+        let next = self.chars.next();
+        self.ch = next.map(|(_, c)| c);
+        self.offset = next.map(|(o, _)| o);
     }
 
-    pub fn next_token(&mut self) -> Option<Token> {
+    pub fn next_token(&mut self) -> Option<Token<'a>> {
         if self.eof {
             return None;
         }
@@ -119,16 +123,16 @@ impl<'a> Lexer<'a> {
         Some(tok)
     }
 
-    fn read_identifier(&mut self) -> String {
-        let mut res = String::new();
+    fn read_identifier(&mut self) -> &'a str {
+        let begin = self.offset.unwrap_or(self.bytes.len());
         while let Some(c) = self.ch {
             if !is_letter(c) {
                 break;
             }
-            res.push(c);
             self.read_char();
         }
-        res
+        let end = self.offset.unwrap_or(self.bytes.len());
+        from_utf8(&self.bytes[begin..end]).expect("internal logic error to get offset")
     }
 
     fn read_number(&mut self) -> i64 {
@@ -152,7 +156,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn lookup_ident(&mut self, ident: String) -> Token {
+    fn lookup_ident(&mut self, ident: &'a str) -> Token<'a> {
         match ident.as_ref() {
             "let" => Token::Let,
             "fn" => Token::Function,
@@ -161,25 +165,15 @@ impl<'a> Lexer<'a> {
             "return" => Token::Return,
             "if" => Token::If,
             "else" => Token::Else,
-            _ => Token::Ident(self.loopup_dict(ident)),
-        }
-    }
-
-    fn loopup_dict(&mut self, ident: String) -> u32 {
-        if self.dict.contains_key(&ident) {
-            *self.dict.get(&ident).unwrap()
-        } else {
-            let res = self.dict.len() as u32;
-            self.dict.insert(ident, res);
-            res
+            _ => Token::Ident(ident),
         }
     }
 }
 
 impl<'a> Iterator for Lexer<'a> {
-    type Item = Token;
+    type Item = Token<'a>;
 
-    fn next(&mut self) -> Option<Token> {
+    fn next(&mut self) -> Option<Token<'a>> {
         self.next_token()
     }
 }
@@ -232,39 +226,39 @@ let result = add(five, ten);
 ";
         let tests = vec![
             Token::Let,
-            Token::Ident(0), // five
+            Token::Ident("five"), // five
             Token::Assign,
             Token::Int(5),
             Token::Semicolon,
             Token::Let,
-            Token::Ident(1), // ten
+            Token::Ident("ten"), // ten
             Token::Assign,
             Token::Int(10),
             Token::Semicolon,
             Token::Let,
-            Token::Ident(2), // add
+            Token::Ident("add"), // add
             Token::Assign,
             Token::Function,
             Token::LeftParen,
-            Token::Ident(3), // x
+            Token::Ident("x"), // x
             Token::Comma,
-            Token::Ident(4), // y
+            Token::Ident("y"), // y
             Token::RightParen,
             Token::LeftBrace,
-            Token::Ident(3), // x
+            Token::Ident("x"), // x
             Token::Plus,
-            Token::Ident(4), // y
+            Token::Ident("y"), // y
             Token::Semicolon,
             Token::RightBrace,
             Token::Semicolon,
             Token::Let,
-            Token::Ident(5), // result
+            Token::Ident("result"), // result
             Token::Assign,
-            Token::Ident(2), // add
+            Token::Ident("add"), // add
             Token::LeftParen,
-            Token::Ident(0), // five
+            Token::Ident("five"), // five
             Token::Comma,
-            Token::Ident(1), // ten
+            Token::Ident("ten"), // ten
             Token::RightParen,
             Token::Semicolon,
             Token::Eof,

@@ -6,7 +6,7 @@ use token::Token;
 
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
-    token: Option<Token>,
+    token: Option<Token<'a>>,
 }
 
 type Result<T> = result::Result<T, ParseError>;
@@ -86,7 +86,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse_program(&mut self) -> Result<Program> {
+    pub fn parse_program(&mut self) -> Result<Program<'a>> {
         let mut program = Program::new();
         loop {
             match self.token {
@@ -101,7 +101,7 @@ impl<'a> Parser<'a> {
         Ok(program)
     }
 
-    fn parse_statement(&mut self) -> Result<Statement> {
+    fn parse_statement(&mut self) -> Result<Statement<'a>> {
         let node = match self.token {
             Some(Token::Let) => {
                 let s = self.parse_let_statement()?;
@@ -120,11 +120,11 @@ impl<'a> Parser<'a> {
         Ok(Statement { node })
     }
 
-    fn parse_expression(&mut self) -> Result<Expression> {
+    fn parse_expression(&mut self) -> Result<Expression<'a>> {
         self.parse_expression_inner(Precedence::Lowest)
     }
 
-    fn parse_expression_inner(&mut self, precedence: Precedence) -> Result<Expression> {
+    fn parse_expression_inner(&mut self, precedence: Precedence) -> Result<Expression<'a>> {
         let mut left = self.parse_prefix()?;
         while let Some(token) = self.token {
             let tok_prec = Precedence::get(&token);
@@ -137,7 +137,7 @@ impl<'a> Parser<'a> {
         Ok(left)
     }
 
-    fn parse_prefix(&mut self) -> Result<Expression> {
+    fn parse_prefix(&mut self) -> Result<Expression<'a>> {
         match self.token {
             Some(Token::Ident(_)) => self.parse_identifier_expr(),
             Some(Token::Int(_)) => self.parse_integer_expr(),
@@ -152,7 +152,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_infix(&mut self, left: Expression) -> Result<Expression> {
+    fn parse_infix(&mut self, left: Expression<'a>) -> Result<Expression<'a>> {
         match self.token {
             Some(Token::Plus) => self.parse_bin_expr(left),
             Some(Token::Minus) => self.parse_bin_expr(left),
@@ -168,7 +168,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_unary_expr(&mut self) -> Result<Expression> {
+    fn parse_unary_expr(&mut self) -> Result<Expression<'a>> {
         let op = match self.token {
             Some(Token::Bang) => UnOp::Not,
             Some(Token::Minus) => UnOp::Neg,
@@ -181,14 +181,14 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_grouped_expr(&mut self) -> Result<Expression> {
+    fn parse_grouped_expr(&mut self) -> Result<Expression<'a>> {
         self.expect(&Token::LeftParen)?;
         let res = self.parse_expression();
         self.expect(&Token::RightParen)?;
         res
     }
 
-    fn parse_bin_expr(&mut self, left: Expression) -> Result<Expression> {
+    fn parse_bin_expr(&mut self, left: Expression<'a>) -> Result<Expression<'a>> {
         let op = match self.token {
             Some(Token::Plus) => BinOp::Add,
             Some(Token::Minus) => BinOp::Sub,
@@ -214,28 +214,28 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_identifier_expr(&mut self) -> Result<Expression> {
+    fn parse_identifier_expr(&mut self) -> Result<Expression<'a>> {
         let ident = self.parse_identifier()?;
         Ok(Expression {
             node: ExpressionKind::Identifier(ident),
         })
     }
 
-    fn parse_integer_expr(&mut self) -> Result<Expression> {
+    fn parse_integer_expr(&mut self) -> Result<Expression<'a>> {
         let integer = self.parse_integer()?;
         Ok(Expression {
             node: ExpressionKind::IntegerLiteral(integer),
         })
     }
 
-    fn parse_boolean_expr(&mut self) -> Result<Expression> {
+    fn parse_boolean_expr(&mut self) -> Result<Expression<'a>> {
         let boolean = self.parse_boolean()?;
         Ok(Expression {
             node: ExpressionKind::BooleanLiteral(boolean),
         })
     }
 
-    fn parse_if_expr(&mut self) -> Result<Expression> {
+    fn parse_if_expr(&mut self) -> Result<Expression<'a>> {
         self.expect(&Token::If)?;
         self.expect(&Token::LeftParen)?;
         let cond = Box::new(self.parse_expression()?);
@@ -251,7 +251,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_call_expr(&mut self, func: Expression) -> Result<Expression> {
+    fn parse_call_expr(&mut self, func: Expression<'a>) -> Result<Expression<'a>> {
         let func = Box::new(func);
         let args = self.parse_call_args()?;
         Ok(Expression {
@@ -259,7 +259,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_call_args(&mut self) -> Result<Vec<Expression>> {
+    fn parse_call_args(&mut self) -> Result<Vec<Expression<'a>>> {
         self.expect(&Token::LeftParen);
         let mut args = Vec::new();
         while let Some(token) = self.token {
@@ -275,7 +275,7 @@ impl<'a> Parser<'a> {
         Ok(args)
     }
 
-    fn parse_block_statement(&mut self) -> Result<BlockStatement> {
+    fn parse_block_statement(&mut self) -> Result<BlockStatement<'a>> {
         self.expect(&Token::LeftBrace)?;
         let mut statements = Vec::new();
         loop {
@@ -294,7 +294,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_function_literal(&mut self) -> Result<Expression> {
+    fn parse_function_literal(&mut self) -> Result<Expression<'a>> {
         self.expect(&Token::Function)?;
         let params = self.parse_function_params()?;
         let body = Box::new(self.parse_block_statement()?);
@@ -303,7 +303,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_function_params(&mut self) -> Result<Vec<Identifier>> {
+    fn parse_function_params(&mut self) -> Result<Vec<Identifier<'a>>> {
         let mut params = Vec::new();
         self.expect(&Token::LeftParen)?;
         while let Some(token) = self.token {
@@ -319,7 +319,7 @@ impl<'a> Parser<'a> {
         Ok(params)
     }
 
-    fn parse_let_statement(&mut self) -> Result<LetStatement> {
+    fn parse_let_statement(&mut self) -> Result<LetStatement<'a>> {
         self.expect(&Token::Let)?;
         let ident = self.parse_identifier()?;
         self.expect(&Token::Assign)?;
@@ -331,7 +331,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_return_statement(&mut self) -> Result<ReturnStatement> {
+    fn parse_return_statement(&mut self) -> Result<ReturnStatement<'a>> {
         self.expect(&Token::Return)?;
         let expr = self.parse_expression()?;
         self.expect(&Token::Semicolon)?;
@@ -340,7 +340,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_expression_statement(&mut self) -> Result<ExpressionStatement> {
+    fn parse_expression_statement(&mut self) -> Result<ExpressionStatement<'a>> {
         let expr = self.parse_expression()?;
         self.eat(&Token::Semicolon);
         Ok(ExpressionStatement {
@@ -348,7 +348,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_identifier(&mut self) -> Result<Identifier> {
+    fn parse_identifier(&mut self) -> Result<Identifier<'a>> {
         match self.token {
             Some(Token::Ident(value)) => {
                 self.bump();
@@ -403,7 +403,7 @@ mod tests {
         let mut p = Parser::new(input);
         let program = p.parse_program().unwrap();
 
-        let tests = [0, 1, 2, 0];
+        let tests = ["x", "y", "foobar", "x"];
 
         assert_eq!(tests.len(), program.statements.len());
         for (&t, ref stmt) in tests.iter().zip(program.statements.iter()) {
@@ -650,17 +650,14 @@ mod tests {
     #[test]
     fn test_operator_precedence_parsing() {
         let tests = vec![
-            ("-a * b", "((-X0) * X1)"),
-            ("!-a", "(!(-X0))"),
-            ("a + b + c", "((X0 + X1) + X2)"),
-            ("a + b - c", "((X0 + X1) - X2)"),
-            ("a * b * c", "((X0 * X1) * X2)"),
-            ("a * b / c", "((X0 * X1) / X2)"),
-            ("a + b / c", "(X0 + (X1 / X2))"),
-            (
-                "a + b * c + d / e - f",
-                "(((X0 + (X1 * X2)) + (X3 / X4)) - X5)",
-            ),
+            ("-a * b", "((-a) * b)"),
+            ("!-a", "(!(-a))"),
+            ("a + b + c", "((a + b) + c)"),
+            ("a + b - c", "((a + b) - c)"),
+            ("a * b * c", "((a * b) * c)"),
+            ("a * b / c", "((a * b) / c)"),
+            ("a + b / c", "(a + (b / c))"),
+            ("a + b * c + d / e - f", "(((a + (b * c)) + (d / e)) - f)"),
             ("3 + 4; -5 * 5", "(3 + 4)\n((-5) * 5)"),
             ("5 > 4 == 3 < 4", "((5 > 4) == (3 < 4))"),
             ("5 > 4 != 3 < 4", "((5 > 4) != (3 < 4))"),
@@ -674,7 +671,7 @@ mod tests {
             ("2 / (5 + 5)", "(2 / (5 + 5))"),
             ("-(5 + 5)", "(-(5 + 5))"),
             ("!(true == true)", "(!(true == true))"),
-            ("1 + add(2 * (3 + 4)) + 5", "((1 + X0((2 * (3 + 4)))) + 5)"),
+            ("1 + add(2 * (3 + 4)) + 5", "((1 + add((2 * (3 + 4)))) + 5)"),
         ];
         for (input, expected) in tests {
             let mut p = Parser::new(input);

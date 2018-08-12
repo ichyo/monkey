@@ -1,9 +1,9 @@
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
-pub enum Token {
+pub enum Token<'a> {
     Illegal,
     Eof,
 
-    Ident(u32),
+    Ident(&'a str),
     Int(i64),
 
     Assign,
