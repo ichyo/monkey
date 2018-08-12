@@ -59,7 +59,36 @@ fn eval_bin(bin: &BinExpression) -> Object {
             (Object::Integer(left), Object::Integer(right)) => Object::Integer(left + right),
             _ => unimplemented!(),
         },
-        _ => unimplemented!(),
+        BinOp::Sub => match (left, right) {
+            (Object::Integer(left), Object::Integer(right)) => Object::Integer(left - right),
+            _ => unimplemented!(),
+        },
+        BinOp::Mul => match (left, right) {
+            (Object::Integer(left), Object::Integer(right)) => Object::Integer(left * right),
+            _ => unimplemented!(),
+        },
+        BinOp::Div => match (left, right) {
+            (Object::Integer(left), Object::Integer(right)) => Object::Integer(left / right),
+            _ => unimplemented!(),
+        },
+        BinOp::Lt => match (left, right) {
+            (Object::Integer(left), Object::Integer(right)) => Object::Boolean(left < right),
+            _ => unimplemented!(),
+        },
+        BinOp::Gt => match (left, right) {
+            (Object::Integer(left), Object::Integer(right)) => Object::Boolean(left > right),
+            _ => unimplemented!(),
+        },
+        BinOp::Eq => match (left, right) {
+            (Object::Integer(left), Object::Integer(right)) => Object::Boolean(left == right),
+            (Object::Boolean(left), Object::Boolean(right)) => Object::Boolean(left == right),
+            _ => unimplemented!(),
+        },
+        BinOp::Ne => match (left, right) {
+            (Object::Integer(left), Object::Integer(right)) => Object::Boolean(left != right),
+            (Object::Boolean(left), Object::Boolean(right)) => Object::Boolean(left != right),
+            _ => unimplemented!(),
+        },
     }
 }
 
@@ -71,7 +100,22 @@ mod test {
 
     #[test]
     fn test_eval_integer_expression() {
-        let tests = vec![("5", 5), ("10", 10), ("-3", -3)];
+        let tests = vec![
+            ("5", 5),
+            ("10", 10),
+            ("-3", -3),
+            ("5 + 5 + 5 + 5 - 10", 10),
+            ("2 * 2 * 2 * 2 * 2", 32),
+            ("-50 + 100 + -50", 0),
+            ("5 * 2 + 10", 20),
+            ("5 + 2 * 10", 25),
+            ("20 + 2 * -10", 0),
+            ("50 / 2 * 2 + 10", 60),
+            ("2 * (5 + 10)", 30),
+            ("3 * 3 * 3 + 10", 37),
+            ("3 * (3 * 3) + 10", 37),
+            ("(5 + 10 * 2 + 15 / 3) * 2 + -10", 50),
+        ];
 
         for (input, expected) in tests {
             let evaluated = test_eval(input);
