@@ -1,7 +1,9 @@
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Object {
     Integer(i64),
     Boolean(bool),
+    Unit,
+    Return(Box<Object>),
 }
 
 impl Object {
@@ -9,6 +11,8 @@ impl Object {
         match self {
             Object::Integer(x) => x.to_string(),
             Object::Boolean(x) => x.to_string(),
+            Object::Unit => "()".to_string(),
+            Object::Return(x) => format!("Return({})", x.inspect()),
         }
     }
 }

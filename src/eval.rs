@@ -6,20 +6,31 @@ pub fn eval(p: &Program) -> Object {
 }
 
 fn eval_program(p: &Program) -> Object {
-    eval_statements(&p.statements)
+    let mut res = Object::Unit;
+    for stmt in &p.statements {
+        res = eval_statement(stmt);
+        if let Object::Return(val) = res {
+            return *val;
+        }
+    }
+    res
 }
 
-fn eval_statements(statements: &Vec<Statement>) -> Object {
-    statements
-        .iter()
-        .fold(None, |res, stmt| Some(eval_statement(stmt)))
-        .expect("no statement")
+fn eval_block_statements(b: &BlockStatement) -> Object {
+    let mut res = Object::Unit;
+    for stmt in &b.statements {
+        res = eval_statement(stmt);
+        if let Object::Return(_) = res {
+            return res;
+        }
+    }
+    res
 }
 
 fn eval_statement(stmt: &Statement) -> Object {
     match &stmt.node {
         StatementKind::Let(let_stmt) => unimplemented!(),
-        StatementKind::Return(ret_stmt) => unimplemented!(),
+        StatementKind::Return(ret_stmt) => Object::Return(Box::new(eval_expr(&ret_stmt.value))),
         StatementKind::Expression(expr_stmt) => eval_expr(&expr_stmt.expr),
     }
 }
@@ -31,9 +42,25 @@ fn eval_expr(expr: &Expression) -> Object {
         ExpressionKind::BooleanLiteral(x) => Object::Boolean(x.value),
         ExpressionKind::Unary(x) => eval_unary(x),
         ExpressionKind::Bin(x) => eval_bin(x),
-        ExpressionKind::If(x) => unimplemented!(),
+        ExpressionKind::If(x) => eval_if(x),
         ExpressionKind::Func(x) => unimplemented!(),
         ExpressionKind::Call(x) => unimplemented!(),
+    }
+}
+
+fn eval_if(if_expr: &IfExpression) -> Object {
+    let cond = eval_expr(&if_expr.cond);
+    match cond {
+        Object::Boolean(cond) => {
+            if cond {
+                eval_block_statements(&if_expr.cons)
+            } else if let Some(alt) = &if_expr.alt {
+                eval_block_statements(alt)
+            } else {
+                Object::Unit
+            }
+        }
+        _ => unimplemented!(),
     }
 }
 
@@ -145,6 +172,46 @@ mod test {
         for (input, expected) in tests {
             let evaluated = test_eval(input);
             test_boolean_object(&evaluated, expected);
+        }
+    }
+
+    #[test]
+    fn test_if_else_expressions() {
+        let tests = vec![
+            ("if (true) { 10 }", Object::Integer(10)),
+            ("if (false) { 10 }", Object::Unit),
+            ("if (1 < 2) { 10 }", Object::Integer(10)),
+            ("if (1 > 2) { 10 }", Object::Unit),
+            ("if (1 > 2) { 10 } else { 20 }", Object::Integer(20)),
+            ("if (1 < 2) { 10 } else { 20 }", Object::Integer(10)),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            assert_eq!(evaluated, expected);
+        }
+    }
+
+    #[test]
+    fn test_return_statement() {
+        let tests = vec![
+            ("return 10;", Object::Integer(10)),
+            ("return 10; 9;", Object::Integer(10)),
+            ("return 2*5; 9;", Object::Integer(10)),
+            ("9; return 2*5; 9;", Object::Integer(10)),
+            (
+                "if (true) { if (true) { return 2*5; } return 1; }; 9;",
+                Object::Integer(10),
+            ),
+            (
+                "if (true) { if (false) { return 2*5; } return 1; }; 9;",
+                Object::Integer(1),
+            ),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            assert_eq!(evaluated, expected);
         }
     }
 
