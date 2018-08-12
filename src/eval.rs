@@ -132,6 +132,14 @@ mod test {
             ("!false", true),
             ("!!true", true),
             ("!!false", false),
+            ("true == true", true),
+            ("false == false", true),
+            ("true == false", false),
+            ("false != true", true),
+            ("(1 < 2) == true", true),
+            ("(1 < 2) == false", false),
+            ("(1 > 2) == true", false),
+            ("(1 > 2) == false", true),
         ];
 
         for (input, expected) in tests {
